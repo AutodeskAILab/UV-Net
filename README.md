@@ -16,6 +16,37 @@ The topology is represented using a face-adjacency graph where features from the
 
 ![MessagePassing](docs/img/MessagePassing.png)
 
+## Environment setup
+
+## Training
+
+The classification model can be trained using:
+```
+python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --epochs 100 --batch_size 64
+```
+
+Only the SolidLetters dataset is currently supported for classification.
+
+The segmentation model can be trained similarly:
+```
+python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --epochs 100 --batch_size 64
+```
+
+The MFCAD and Fusion 360 Gallery segmentation datasets are supported for segmentation.
+
+The logs will be stored in a folder called `classification_logs` or `segmentation_logs` based on the experiment, and can be monitored with Tensorboard:
+
+```
+tensorboard --logdir *_logs
+```
+
+## Testing
+The best checkpoints based on the smallest validation loss are saved in the `classification_checkpoints` or `segmentation_checkpoints` folder. The checkpoints can be used to test the model as follows:
+
+```
+python segmentation.py test --dataset mfcad --dataset_path /path/to/mfcad/ --checkpoint ./segmentation_checkpoints/best-epoch=XX-val_loss=X.XX.ckpt
+```
+
 ## Data
 The network consumes [DGL](https://dgl.ai/)-based face-adjacency graphs, where each B-rep face is mapped to a node, and each B-rep edge is mapped to a edge. The face UV-grids are expected as node features and edge UV-grids as edge features. For example, the UV-grid features from our face-adjacency graph representation can be accessed as follows:
 
@@ -34,72 +65,41 @@ graph.edata["x"]  # num_edgesx10x6 edge UV-grids (we use 10 samples along the u-
 
 SolidLetters is a synthetic dataset of ~96k solids created by extruding and filleting fonts. It has class labels (alphabets), and style labels (font name and upper/lower case) for each solid.
 
-The dataset of face-adjacency graphs can be downloaded from here:
-
-
-We also provide solid models in SMT format that can be processed with the Autodesk Fusion 360 software, and in STEP format that can be read using OpenCascade and its Python bindings [pythonOCC](https://github.com/tpaviot/pythonocc-core).
+The dataset can be downloaded from here:
 
 To train the UV-Net classification model on the data:
 
-1. Extract the graphs to a folder, say `/path/to/solidletters/`. Please refer to the license in `/path/to/solidletters/license.pdf`.
+1. Extract it to a folder, say `/path/to/solidletters/`. Please refer to the license in `/path/to/solidletters/SolidLetters Dataset License.pdf`.
 
-2. There should be three subfolders:
+2. There should be three files:
 
-- `/path/to/solidletters/smt` contains the solid models in `.smt` format that can be read by a proprietory Autodesk solid modeling kernel and the Fusion 360 software.
-- `/path/to/solidletters/step` contains the solid models in `.step` format that can be read using OpenCascade and its Python bindings [pythonOCC](https://github.com/tpaviot/pythonocc-core).
-- `/path/to/solidletters/bin` contains the derived face-adjacency graphs in DGL's `.bin` format with UV-grids stored as node and edge features. This is the data that gets passed to UV-Net for training and testing.
+- `/path/to/solidletters/smt.7z` contains the solid models in `.smt` format that can be read by a proprietory Autodesk solid modeling kernel and the Fusion 360 software.
+- `/path/to/solidletters/step.zip` contains the solid models in `.step` format that can be read with OpenCascade and its Python bindings [pythonOCC](https://github.com/tpaviot/pythonocc-core).
+- `/path/to/solidletters/graph.7z` contains the derived face-adjacency graphs in DGL's `.bin` format with UV-grids stored as node and edge features. This is the data in that gets passed to UV-Net for training and testing. Extract this file.
 
-3. Pass the `solidletters` folder to the `--dataset_path` argument in the classification script and set `--dataset` to `solidletters`.
+3. Pass the `/path/to/solidletters/` folder to the `--dataset_path` argument in the classification script and set `--dataset` to `solidletters`.
 
 ### MFCAD
 
-The original solid model data is available here in STEP format: github.com/hducg/MFCAD
+The original solid model data is available here in STEP format: [github.com/hducg/MFCAD](https://github.com/hducg/MFCAD).
+
 We provide pre-processed DGL graphs in `.bin` format to train UV-Net on this dataset.
 
-1. Download and extract the data to a folder, say `/path/to/mfcad/` from here:
+1. Download and extract the data to a folder, say `/path/to/mfcad/` from here: https://uv-net-data.s3.us-west-2.amazonaws.com/MFCADDataset.zip
 
-2. Pass the `mfcad` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `mfcad`.
+2. Pass the `/path/to/mfcad/` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `mfcad`.
 
 ### Fusion 360 Gallery segmentation
 
 We provide pre-processed DGL graphs in `.bin` format to train UV-Net on the Fusion 360 Gallery segmentation task.
 
-1. Download and extract the dataset to a folder, say `/path/to/fusionallery/` from here:
+1. Download and extract the dataset to a folder, say `/path/to/fusionallery/` from here: https://uv-net-data.s3.us-west-2.amazonaws.com/Fusion360GallerySegmentationDataset.zip
 
-2. Pass the `fusiongallery` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `fusiongallery`.
+2. Pass the `/path/to/fusionallery/` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `fusiongallery`.
 
 
 ## Processing your own data
-See guide [here](process/README.md) to convert your own solid model data (in STEP format) to `.bin` files that are understood by UV-Net.
-
-## Training
-
-The classification model can be trained using:
-```
-python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --epochs 100 --batch_size 64
-```
-
-Only the SolidLetters dataset is currently supported for classification.
-
-The segmentation model can be trained similarly:
-```
-python segmentation.py train --dataset mfcad --dataset_path /path/to/graphs --epochs 100 --batch_size 64
-```
-
-The MFCAD and Fusion 360 Gallery segmentation datasets are supported.
-
-The logs will be stored in a folder called `classification_logs` or `segmentation_logs` based on the experiment, and can be monitored with Tensorboard:
-
-```
-tensorboard --logdir *_logs
-```
-
-## Testing
-The best checkpoints based on the smallest validation loss is saved in the `classification_checkpoints` or `segmentation_checkpoints` folder. The checkpoints can be used to test the model as follows:
-
-```
-python segmentation.py test --dataset mfcad --dataset_path /path/to/dataset --checkpoint ./segmentation_checkpoints/best-epoch=65-val_loss=0.00.ckpt
-```
+Refer to our [guide](process/README.md) to process your own solid model data (in STEP format) into the `.bin` format that is understood by UV-Net, convert STEP files to meshes and pointclouds.
 
 ## Citation
 

@@ -70,9 +70,9 @@ graph.edata["x"]  # num_edgesx10x6 edge UV-grids (we use 10 samples along the u-
 
 SolidLetters is a synthetic dataset of ~96k solids created by extruding and filleting fonts. It has class labels (alphabets), and style labels (font name and upper/lower case) for each solid.
 
-The dataset can be downloaded from here:
+The dataset can be downloaded from here: https://uv-net-data.s3.us-west-2.amazonaws.com/SolidLetters.zip
 
-To train the UV-Net classification model on the data:
+To train the UV-Net classification model on the data: 
 
 1. Extract it to a folder, say `/path/to/solidletters/`. Please refer to the license in `/path/to/solidletters/SolidLetters Dataset License.pdf`.
 
@@ -96,11 +96,11 @@ We provide pre-processed DGL graphs in `.bin` format to train UV-Net on this dat
 
 ### Fusion 360 Gallery segmentation
 
-We provide pre-processed DGL graphs in `.bin` format to train UV-Net on the Fusion 360 Gallery segmentation task.
+We provide pre-processed DGL graphs in `.bin` format to train UV-Net on the [Fusion 360 Gallery](https://github.com/AutodeskAILab/Fusion360GalleryDataset) segmentation task.
 
-1. Download and extract the dataset to a folder, say `/path/to/fusionallery/` from here: https://uv-net-data.s3.us-west-2.amazonaws.com/Fusion360GallerySegmentationDataset.zip
+1. Download and extract the dataset to a folder, say `/path/to/fusiongallery/` from here: https://uv-net-data.s3.us-west-2.amazonaws.com/Fusion360GallerySegmentationDataset.zip
 
-2. Pass the `/path/to/fusionallery/` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `fusiongallery`.
+2. Pass the `/path/to/fusiongallery/` folder to the `--dataset_path` argument in the segmentation script and set `--dataset` to `fusiongallery`.
 
 
 ## Processing your own data

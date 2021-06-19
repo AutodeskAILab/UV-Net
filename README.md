@@ -18,6 +18,11 @@ The topology is represented using a face-adjacency graph where features from the
 
 ## Environment setup
 
+```
+conda env create -f environment.yml
+conda activate uv_net
+```
+
 ## Training
 
 The classification model can be trained using:

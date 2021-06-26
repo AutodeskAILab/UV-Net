@@ -15,6 +15,7 @@ dependencies:
   - joblib=1.0.1=pyhd3eb1b0_0
   - matplotlib=3.4.2
   - matplotlib-base=3.4.2
+  - scikit-learn
   - torchmetrics=0.3.2
   - tqdm=4.59.0
   - trimesh=3.9.18

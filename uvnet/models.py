@@ -256,10 +256,8 @@ class UVNetSegmenter(nn.Module):
         )
         # Repeat the global graph embedding so that it can be
         # concatenated to the per-node embeddings
-        num_nodes_per_graph = batched_graph.batch_num_nodes()
-        graph_emb = graph_emb.repeat_interleave(
-            torch.cuda.LongTensor(num_nodes_per_graph), dim=0,
-        ).to(graph_emb.device)
+        num_nodes_per_graph = batched_graph.batch_num_nodes().to(graph_emb.device)
+        graph_emb = graph_emb.repeat_interleave(num_nodes_per_graph, dim=0).to(graph_emb.device)
         local_global_feat = torch.cat((node_emb, graph_emb), dim=1)
         # Map to logits
         out = self.seg(local_global_feat)

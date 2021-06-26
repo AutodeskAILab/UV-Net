@@ -35,7 +35,7 @@ def _char_to_label(char):
 
 class SolidLetters(Dataset):
     @classmethod
-    def num_classes():
+    def num_classes(cls):
         return 26
 
     def __init__(

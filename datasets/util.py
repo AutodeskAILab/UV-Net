@@ -6,8 +6,8 @@ from scipy.spatial.transform import Rotation
 
 
 def bounding_box_uvgrid(inp: torch.Tensor):
-    pts = inp[:, :, :, :3].reshape((-1, 3))
-    mask = inp[:, :, :, 6].reshape(-1)
+    pts = inp[..., :3].reshape((-1, 3))
+    mask = inp[..., 6].reshape(-1)
     point_indices_inside_faces = mask == 1
     pts = pts[point_indices_inside_faces, :]
     return bounding_box_pointcloud(pts)
@@ -26,8 +26,8 @@ def center_and_scale_uvgrid(inp: torch.Tensor, return_center_scale=False):
     diag = bbox[1] - bbox[0]
     scale = 2.0 / max(diag[0], diag[1], diag[2])
     center = 0.5 * (bbox[0] + bbox[1])
-    inp[:, :, :, :3] -= center
-    inp[:, :, :, :3] *= scale
+    inp[..., :3] -= center
+    inp[..., :3] *= scale
     if return_center_scale:
         return inp, center, scale
     return inp
@@ -49,11 +49,11 @@ def get_random_rotation():
 def rotate_uvgrid(inp, rotation):
     """Rotate the node features in the graph by a given rotation"""
     Rmat = torch.tensor(rotation.as_matrix()).float()
-    orig_size = inp[:, :, :, :3].size()
-    inp[:, :, :, :3] = torch.mm(inp[:, :, :, :3].view(-1, 3), Rmat).view(
+    orig_size = inp[..., :3].size()
+    inp[..., :3] = torch.mm(inp[..., :3].view(-1, 3), Rmat).view(
         orig_size
     )  # Points
-    inp[:, :, :, 3:6] = torch.mm(inp[:, :, :, 3:6].view(-1, 3), Rmat).view(
+    inp[..., 3:6] = torch.mm(inp[..., 3:6].view(-1, 3), Rmat).view(
         orig_size
     )  # Normals/tangents
     return inp

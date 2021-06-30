@@ -1,5 +1,6 @@
 import argparse
 
+import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -14,6 +15,7 @@ parser.add_argument("--dataset", choices=("mfcad", "fusiongallery"), help="Segme
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
+parser.add_argument("--cpu", action="store_true", help="Use the CPU for training/testing")
 parser.add_argument("--checkpoint", type=str, default=None, help="Checkpoint file to load weights from for testing")
 
 args = parser.parse_args()
@@ -24,8 +26,10 @@ checkpoint_callback = ModelCheckpoint(
     filename="best-{epoch}-{val_loss:.2f}",
     save_last=True,
 )
+
+use_cpu = args.cpu or (not torch.cuda.is_available())
 trainer = Trainer(
-    gpus=1,
+    gpus=None if use_cpu else 1,
     callbacks=[checkpoint_callback],
     check_val_every_n_epoch=1,
     max_epochs=args.epochs,
@@ -35,7 +39,6 @@ trainer = Trainer(
 if args.dataset == "mfcad":
     Dataset = MFCADDataset
 elif args.dataset == "fusiongallery":
-    pass
     Dataset = FusionGalleryDataset
 
 if args.traintest == "train":

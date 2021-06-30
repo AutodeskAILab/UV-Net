@@ -142,7 +142,8 @@ class Classification(pl.LightningModule):
         return logits
 
     def training_step(self, batch, batch_idx):
-        inputs, labels = batch
+        inputs = batch["graph"].to(self.device)
+        labels = batch["labels"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
@@ -156,7 +157,8 @@ class Classification(pl.LightningModule):
         self.log("train_acc_epoch", self.train_acc.compute())
 
     def validation_step(self, batch, batch_idx):
-        inputs, labels = batch
+        inputs = batch["graph"].to(self.device)
+        labels = batch["labels"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
@@ -170,7 +172,8 @@ class Classification(pl.LightningModule):
         self.log("val_acc_epoch", self.val_acc.compute())
 
     def test_step(self, batch, batch_idx):
-        inputs, labels = batch
+        inputs = batch["graph"].to(self.device)
+        labels = batch["labels"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
@@ -291,7 +294,7 @@ class Segmentation(pl.LightningModule):
         return logits
 
     def training_step(self, batch, batch_idx):
-        inputs = batch
+        inputs = batch["graph"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         labels = inputs.ndata["y"]
@@ -306,7 +309,7 @@ class Segmentation(pl.LightningModule):
         self.log("train_iou", self.train_iou.compute())
 
     def validation_step(self, batch, batch_idx):
-        inputs = batch
+        inputs = batch["graph"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         labels = inputs.ndata["y"]
@@ -321,7 +324,7 @@ class Segmentation(pl.LightningModule):
         self.log("val_iou", self.val_iou.compute())
 
     def test_step(self, batch, batch_idx):
-        inputs = batch
+        inputs = batch["graph"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         labels = inputs.ndata["y"]

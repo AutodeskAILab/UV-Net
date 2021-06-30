@@ -1,11 +1,9 @@
 import numpy as np
 from datasets.base import BaseDataset
 import pathlib
-from torch.utils.data import Dataset, DataLoader
 import torch
 import json
-from datasets import util
-from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 
 class FusionGalleryDataset(BaseDataset):
@@ -39,7 +37,14 @@ class FusionGalleryDataset(BaseDataset):
         # But it's not easy to perform stratified sampling on some rare classes
         # which only show up on a few solids.
         if split in ("train", "val"):
-            split_filelist = filelist["train"]
+            full_train_filelist = filelist["train"]
+            train_filesplit, val_filesplit = train_test_split(
+                full_train_filelist, test_size=0.2, random_state=42
+            )
+            if split == "train":
+                split_filelist = train_filesplit
+            else:
+                split_filelist = val_filesplit
         else:
             split_filelist = filelist["test"]
 

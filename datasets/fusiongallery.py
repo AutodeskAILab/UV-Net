@@ -51,19 +51,19 @@ class FusionGalleryDataset(BaseDataset):
         self.random_rotate = random_rotate
 
         # Call base class method to load all graphs
-        print(f"Loading {split} graphs...")
+        print(f"Loading {split} data...")
         all_files = [path.joinpath("graph").joinpath(fn + ".bin") for fn in split_filelist]
         self.load_graphs(all_files, center_and_scale)
-        print("Done loading {} files".format(len(self.files)))
+        print("Done loading {} files".format(len(self.data)))
 
     def load_one_graph(self, file_path):
-        # Load the graph use base class method
-        graph = super().load_one_graph(file_path)
+        # Load the graph using base class method
+        sample = super().load_one_graph(file_path)
         # Additionally load the label and store it as node data
         label = np.loadtxt(
             self.path.joinpath("breps").joinpath(file_path.stem + ".seg"), dtype=np.int, ndmin=1
         )
-        if graph.number_of_nodes() != label.shape[0]:
+        if sample["graph"].number_of_nodes() != label.shape[0]:
             return None
-        graph.ndata["y"] = torch.tensor(label).long()
-        return graph
+        sample["graph"].ndata["y"] = torch.tensor(label).long()
+        return sample

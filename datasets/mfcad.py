@@ -1,12 +1,7 @@
 from datasets.base import BaseDataset
 import pathlib
-from torch.utils.data import Dataset, DataLoader
-import dgl
 import torch
-from dgl.data.utils import load_graphs
 import json
-from datasets import util
-from tqdm import tqdm
 
 
 class MFCADDataset(BaseDataset):
@@ -54,26 +49,13 @@ class MFCADDataset(BaseDataset):
             all_files.append(path.joinpath("graph").joinpath(fn + ".bin"))
 
         # Load graphs
-        print(f"Loading {split} graphs...")
+        print(f"Loading {split} data...")
         self.load_graphs(all_files, center_and_scale)
-
-        # Load labels from the json files in the subfolder
-        print(f"Loading {split} labels...")
-        for i, fn in enumerate(tqdm(self.files)):
-            label_file = path.joinpath("labels").joinpath(fn.stem + "_ids.json")
-            with open(str(label_file), "r") as read_file:
-                labels_data = json.load(read_file)
-            label = []
-            for face in labels_data["body"]["faces"]:
-                index = face["segment"]["index"]
-                label.append(index)
-            self.graphs[i].ndata["y"] = torch.tensor(label).long()
-
-        print("Done loading {} files".format(len(self.files)))
+        print("Done loading {} files".format(len(self.data)))
 
     def load_one_graph(self, file_path):
-        # Load the graph use base class method
-        graph = super().load_one_graph(file_path)
+        # Load the graph using base class method
+        sample = super().load_one_graph(file_path)
         # Additionally load the label and store it as node data
         label_file = self.path.joinpath("labels").joinpath(file_path.stem + "_ids.json")
         with open(str(label_file), "r") as read_file:
@@ -82,5 +64,5 @@ class MFCADDataset(BaseDataset):
         for face in labels_data["body"]["faces"]:
             index = face["segment"]["index"]
             label.append(index)
-        graph.ndata["y"] = torch.tensor(label).long()
-        return graph
+        sample["graph"].ndata["y"] = torch.tensor(label).long()
+        return sample

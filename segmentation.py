@@ -17,7 +17,6 @@ parser.add_argument(
     "--dataset", choices=("mfcad", "fusiongallery"), help="Segmentation dataset"
 )
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
-parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
 parser.add_argument(
     "--cpu", action="store_true", help="Use the CPU for training/testing"
@@ -34,6 +33,7 @@ parser.add_argument(
     help="Checkpoint file to load weights from for testing",
 )
 
+parser = Trainer.add_argparse_args(parser)
 args = parser.parse_args()
 
 checkpoint_callback = ModelCheckpoint(
@@ -43,12 +43,9 @@ checkpoint_callback = ModelCheckpoint(
     save_last=True,
 )
 
-use_cpu = args.cpu or (not torch.cuda.is_available())
-trainer = Trainer(
-    gpus=None if use_cpu else 1,
+trainer = Trainer.from_argparse_args(
+    args,
     callbacks=[checkpoint_callback],
-    check_val_every_n_epoch=1,
-    max_epochs=args.epochs,
     logger=TensorBoardLogger("segmentation_logs"),
 )
 
@@ -60,7 +57,9 @@ elif args.dataset == "fusiongallery":
 if args.traintest == "train":
     # Train/val
     model = Segmentation(num_classes=Dataset.num_classes())
-    train_data = Dataset(root_dir=args.dataset_path, split="train", random_rotate=args.random_rotate)
+    train_data = Dataset(
+        root_dir=args.dataset_path, split="train", random_rotate=args.random_rotate
+    )
     val_data = Dataset(root_dir=args.dataset_path, split="val")
     train_loader = train_data.get_dataloader(batch_size=args.batch_size, shuffle=True)
     val_loader = val_data.get_dataloader(batch_size=args.batch_size, shuffle=False)
@@ -68,7 +67,9 @@ if args.traintest == "train":
 else:
     # Test
     model = Segmentation.load_from_checkpoint(args.checkpoint)
-    test_data = Dataset(root_dir=args.dataset_path, split="test", random_rotate=args.random_rotate)
+    test_data = Dataset(
+        root_dir=args.dataset_path, split="test", random_rotate=args.random_rotate
+    )
     test_loader = test_data.get_dataloader(batch_size=args.batch_size, shuffle=False)
     results = trainer.test(model=model, test_dataloaders=[test_loader], verbose=False)
     print(f"Segmentation IoU (%) on test set: {results[0]['test_iou'] * 100.0}")

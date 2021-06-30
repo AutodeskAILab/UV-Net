@@ -24,6 +24,7 @@ parser.add_argument(
     help="Checkpoint file to load weights from for testing",
 )
 
+parser = Trainer.add_argparse_args(parser)
 args = parser.parse_args()
 
 checkpoint_callback = ModelCheckpoint(
@@ -33,12 +34,9 @@ checkpoint_callback = ModelCheckpoint(
     save_last=True,
 )
 
-use_cpu = args.cpu or (not torch.cuda.is_available())
-trainer = Trainer(
-    gpus=None if use_cpu else 1,
+trainer = Trainer.from_argparse_args(
+    args,
     callbacks=[checkpoint_callback],
-    check_val_every_n_epoch=1,
-    max_epochs=args.epochs,
     logger=TensorBoardLogger("classification_logs"),
 )
 

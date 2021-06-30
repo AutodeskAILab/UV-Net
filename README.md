@@ -32,14 +32,14 @@ conda install -c dglteam dgl=0.6.1=py39_0
 
 The classification model can be trained using:
 ```
-python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --epochs 100 --batch_size 64
+python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --max_epochs 100 --batch_size 64
 ```
 
 Only the SolidLetters dataset is currently supported for classification.
 
 The segmentation model can be trained similarly:
 ```
-python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --epochs 100 --batch_size 64
+python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --max_epochs 100 --batch_size 64
 ```
 
 The MFCAD and Fusion 360 Gallery segmentation datasets are supported for segmentation.

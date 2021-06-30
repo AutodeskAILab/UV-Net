@@ -32,9 +32,11 @@ class BaseDataset(Dataset):
 
     def center_and_scale(self):
         for i in range(len(self.graphs)):
-            self.graphs[i].ndata["x"] = util.center_and_scale_uvgrid(
-                self.graphs[i].ndata["x"]
+            self.graphs[i].ndata["x"], center, scale = util.center_and_scale_uvgrid(
+                self.graphs[i].ndata["x"], return_center_scale=True
             )
+            self.graphs[i].edata["x"] -= center
+            self.graphs[i].edata["x"] *= scale
 
     def __len__(self):
         return len(self.graphs)

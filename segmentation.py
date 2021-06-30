@@ -1,12 +1,12 @@
 import argparse
+import pathlib
 
-import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from datasets.mfcad import MFCADDataset
 from datasets.fusiongallery import FusionGalleryDataset
+from datasets.mfcad import MFCADDataset
 from uvnet.models import Segmentation
 
 parser = argparse.ArgumentParser("UV-Net solid model face segmentation")
@@ -19,7 +19,10 @@ parser.add_argument(
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
 parser.add_argument(
-    "--cpu", action="store_true", help="Use the CPU for training/testing"
+    "--num_workers",
+    type=int,
+    default=0,
+    help="Number of workers for the dataloader. NOTE: set this to 0 on Windows, any other value leads to poor performance",
 )
 parser.add_argument(
     "--random_rotate",
@@ -32,21 +35,28 @@ parser.add_argument(
     default=None,
     help="Checkpoint file to load weights from for testing",
 )
+parser.add_argument(
+    "--experiment_name",
+    type=str,
+    default="segmentation",
+    help="Experiment name (used to create folder inside ./results/ to save logs and checkpoints)",
+)
 
 parser = Trainer.add_argparse_args(parser)
 args = parser.parse_args()
 
+results_path = (
+    pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
+)
+if not results_path.exists():
+    results_path.mkdir(parents=True, exist_ok=True)
+
 checkpoint_callback = ModelCheckpoint(
-    monitor="val_loss",
-    dirpath="segmentation_checkpoints",
-    filename="best-{epoch}-{val_loss:.2f}",
-    save_last=True,
+    monitor="val_loss", dirpath=str(results_path), filename="best", save_last=True,
 )
 
 trainer = Trainer.from_argparse_args(
-    args,
-    callbacks=[checkpoint_callback],
-    logger=TensorBoardLogger("segmentation_logs"),
+    args, callbacks=[checkpoint_callback], logger=TensorBoardLogger(str(results_path)),
 )
 
 if args.dataset == "mfcad":
@@ -61,8 +71,12 @@ if args.traintest == "train":
         root_dir=args.dataset_path, split="train", random_rotate=args.random_rotate
     )
     val_data = Dataset(root_dir=args.dataset_path, split="val")
-    train_loader = train_data.get_dataloader(batch_size=args.batch_size, shuffle=True)
-    val_loader = val_data.get_dataloader(batch_size=args.batch_size, shuffle=False)
+    train_loader = train_data.get_dataloader(
+        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers
+    )
+    val_loader = val_data.get_dataloader(
+        batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
+    )
     trainer.fit(model, train_loader, val_loader)
 else:
     # Test
@@ -70,6 +84,8 @@ else:
     test_data = Dataset(
         root_dir=args.dataset_path, split="test", random_rotate=args.random_rotate
     )
-    test_loader = test_data.get_dataloader(batch_size=args.batch_size, shuffle=False)
+    test_loader = test_data.get_dataloader(
+        batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
+    )
     results = trainer.test(model=model, test_dataloaders=[test_loader], verbose=False)
     print(f"Segmentation IoU (%) on test set: {results[0]['test_iou'] * 100.0}")

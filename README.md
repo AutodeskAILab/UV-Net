@@ -32,29 +32,29 @@ conda install -c dglteam dgl=0.6.1=py39_0
 
 The classification model can be trained using:
 ```
-python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --max_epochs 100 --batch_size 64
+python classification.py train --dataset solidletters --dataset_path /path/to/solidletters --max_epochs 100 --batch_size 64 --experiment_name classification
 ```
 
 Only the SolidLetters dataset is currently supported for classification.
 
 The segmentation model can be trained similarly:
 ```
-python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --max_epochs 100 --batch_size 64
+python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --max_epochs 100 --batch_size 64 --experiment_name segmentation
 ```
 
 The MFCAD and Fusion 360 Gallery segmentation datasets are supported for segmentation.
 
-The logs will be stored in a folder called `classification_logs` or `segmentation_logs` based on the experiment, and can be monitored with Tensorboard:
+The logs and checkpoints will be stored in a folder called `results/classification` or `results/segmentation` based on the experiment name, and can be monitored with Tensorboard:
 
 ```
-tensorboard --logdir *_logs
+tensorboard --logdir results/<experiment_name>
 ```
 
 ## Testing
-The best checkpoints based on the smallest validation loss are saved in the `classification_checkpoints` or `segmentation_checkpoints` folder. The checkpoints can be used to test the model as follows:
+The best checkpoints based on the smallest validation loss are saved in the results folder. The checkpoints can be used to test the model as follows:
 
 ```
-python segmentation.py test --dataset mfcad --dataset_path /path/to/mfcad/ --checkpoint ./segmentation_checkpoints/best-epoch=XX-val_loss=X.XX.ckpt
+python segmentation.py test --dataset mfcad --dataset_path /path/to/mfcad/ --checkpoint ./results/segmentation/best.ckpt
 ```
 
 ## Data

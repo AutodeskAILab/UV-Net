@@ -78,7 +78,7 @@ class SolidLetters(Dataset):
             self.graphs.append(load_graphs(str(fn))[0][0])
         if self.center_and_scale:
             for i in range(len(self.graphs)):
-                self.graphs[i].ndata["x"] = util.center_and_scale_uvsolid(
+                self.graphs[i].ndata["x"] = util.center_and_scale_uvgrid(
                     self.graphs[i].ndata["x"]
                 )
 

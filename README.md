@@ -23,6 +23,11 @@ conda env create -f environment.yml
 conda activate uv_net
 ```
 
+For CPU-only environments, the CPU-version of the dgl has to be installed manually:
+```
+conda install -c dglteam dgl=0.6.1=py39_0
+```
+
 ## Training
 
 The classification model can be trained using:

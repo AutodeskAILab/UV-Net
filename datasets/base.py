@@ -19,6 +19,8 @@ class BaseDataset(Dataset):
             if not fn.exists():
                 continue
             graph = self.load_one_graph(fn)
+            if graph is None:
+                continue
             self.graphs.append(graph)
             self.files.append(fn)
         if center_and_scale:

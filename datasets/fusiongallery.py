@@ -58,5 +58,7 @@ class FusionGalleryDataset(BaseDataset):
         label = np.loadtxt(
             self.path.joinpath("breps").joinpath(file_path.stem + ".seg"), dtype=np.int, ndmin=1
         )
+        if graph.number_of_nodes() != label.shape[0]:
+            return None
         graph.ndata["y"] = torch.tensor(label).long()
         return graph

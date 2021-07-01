@@ -143,7 +143,7 @@ class Classification(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         inputs = batch["graph"].to(self.device)
-        labels = batch["labels"].to(self.device)
+        labels = batch["label"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
@@ -158,7 +158,7 @@ class Classification(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         inputs = batch["graph"].to(self.device)
-        labels = batch["labels"].to(self.device)
+        labels = batch["label"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
@@ -173,7 +173,7 @@ class Classification(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         inputs = batch["graph"].to(self.device)
-        labels = batch["labels"].to(self.device)
+        labels = batch["label"].to(self.device)
         inputs.ndata["x"] = inputs.ndata["x"].permute(0, 3, 1, 2)
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)

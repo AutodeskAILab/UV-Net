@@ -1,16 +1,10 @@
 import pathlib
-import random
 import string
 
-import dgl
-import numpy as np
 import torch
-from dgl.data.utils import load_graphs, save_graphs
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
 
-from datasets import util
+from datasets.base import BaseDataset
 
 
 def _get_filenames(root_dir, filelist):
@@ -33,7 +27,7 @@ def _char_to_label(char):
     return CHAR2LABEL[char.lower()]
 
 
-class SolidLetters(Dataset):
+class SolidLetters(BaseDataset):
     @staticmethod
     def num_classes():
         return 26
@@ -81,7 +75,7 @@ class SolidLetters(Dataset):
         # Load the graph using base class method
         sample = super().load_one_graph(file_path)
         # Additionally get the label from the filename and store it in the sample dict
-        sample["label"] = _char_to_label(file_path.stem[0])
+        sample["label"] = torch.tensor([_char_to_label(file_path.stem[0])]).long()
         return sample
 
     def _collate(self, batch):

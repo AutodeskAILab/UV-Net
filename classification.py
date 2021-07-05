@@ -30,7 +30,7 @@ parser.add_argument(
 parser.add_argument(
     "--experiment_name",
     type=str,
-    default="segmentation",
+    default="classification",
     help="Experiment name (used to create folder inside ./results/ to save logs and checkpoints)",
 )
 
@@ -73,6 +73,7 @@ if args.traintest == "train":
     trainer.fit(model, train_loader, val_loader)
 else:
     # Test
+    assert args.checkpoint is not None, "Expected the --checkpoint argument to be provided"
     test_data = Dataset(root_dir=args.dataset_path, split="test")
     test_loader = test_data.get_dataloader(
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers

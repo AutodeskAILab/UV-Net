@@ -80,6 +80,7 @@ if args.traintest == "train":
     trainer.fit(model, train_loader, val_loader)
 else:
     # Test
+    assert args.checkpoint is not None, "Expected the --checkpoint argument to be provided"
     model = Segmentation.load_from_checkpoint(args.checkpoint)
     test_data = Dataset(
         root_dir=args.dataset_path, split="test", random_rotate=args.random_rotate

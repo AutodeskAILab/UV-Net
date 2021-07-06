@@ -1,5 +1,6 @@
 import argparse
 import pathlib
+import time
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -51,12 +52,22 @@ results_path = (
 if not results_path.exists():
     results_path.mkdir(parents=True, exist_ok=True)
 
+# Define a path to save the results based date and time. E.g.
+# results/args.experiment_name/0430/123103
+month_day = time.strftime("%m%d")
+hour_min_second = time.strftime("%H%M%S")
 checkpoint_callback = ModelCheckpoint(
-    monitor="val_loss", dirpath=str(results_path), filename="best", save_last=True,
+    monitor="val_loss",
+    dirpath=str(results_path.joinpath(month_day, hour_min_second)),
+    filename="best",
+    save_last=True,
 )
-
 trainer = Trainer.from_argparse_args(
-    args, callbacks=[checkpoint_callback], logger=TensorBoardLogger(str(results_path)),
+    args,
+    callbacks=[checkpoint_callback],
+    logger=TensorBoardLogger(
+        str(results_path), name=month_day, version=hour_min_second,
+    ),
 )
 
 if args.dataset == "mfcad":
@@ -66,6 +77,21 @@ elif args.dataset == "fusiongallery":
 
 if args.traintest == "train":
     # Train/val
+    print(
+        f"""
+-----------------------------------------------------------------------------------
+UV-Net Segmentation
+-----------------------------------------------------------------------------------
+Logs written to results/{args.experiment_name}/{month_day}/{hour_min_second}
+
+To monitor the logs, run:
+tensorboard --logdir results/{args.experiment_name}/{month_day}/{hour_min_second}
+
+The trained model with the best validation loss will be written to:
+results/{args.experiment_name}/{month_day}/{hour_min_second}/best.ckpt
+-----------------------------------------------------------------------------------
+    """
+    )
     model = Segmentation(num_classes=Dataset.num_classes())
     train_data = Dataset(
         root_dir=args.dataset_path, split="train", random_rotate=args.random_rotate
@@ -80,7 +106,9 @@ if args.traintest == "train":
     trainer.fit(model, train_loader, val_loader)
 else:
     # Test
-    assert args.checkpoint is not None, "Expected the --checkpoint argument to be provided"
+    assert (
+        args.checkpoint is not None
+    ), "Expected the --checkpoint argument to be provided"
     model = Segmentation.load_from_checkpoint(args.checkpoint)
     test_data = Dataset(
         root_dir=args.dataset_path, split="test", random_rotate=args.random_rotate

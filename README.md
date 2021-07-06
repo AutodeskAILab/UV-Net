@@ -44,7 +44,7 @@ python segmentation.py train --dataset mfcad --dataset_path /path/to/mfcad --max
 
 The MFCAD and Fusion 360 Gallery segmentation datasets are supported for segmentation.
 
-The logs and checkpoints will be stored in a folder called `results/classification` or `results/segmentation` based on the experiment name, and can be monitored with Tensorboard:
+The logs and checkpoints will be stored in a folder called `results/classification` or `results/segmentation` based on the experiment name and timestamp, and can be monitored with Tensorboard:
 
 ```
 tensorboard --logdir results/<experiment_name>

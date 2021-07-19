@@ -1,16 +1,10 @@
 import pathlib
-import random
 import string
 
-import dgl
-import numpy as np
 import torch
-from dgl.data.utils import load_graphs, save_graphs
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
 
-from datasets import util
+from datasets.base import BaseDataset
 
 
 def _get_filenames(root_dir, filelist):
@@ -33,9 +27,9 @@ def _char_to_label(char):
     return CHAR2LABEL[char.lower()]
 
 
-class SolidLetters(Dataset):
-    @classmethod
-    def num_classes(cls):
+class SolidLetters(BaseDataset):
+    @staticmethod
+    def num_classes():
         return 26
 
     def __init__(
@@ -43,64 +37,48 @@ class SolidLetters(Dataset):
         root_dir,
         split="train",
         center_and_scale=True,
+        random_rotate=False,
     ):
         """
-        Load and create the SolidMNIST dataset
-        :param root_dir: Root path to the dataset (UV bin files are expected to be in a 'bin' subfolder)
-        :param split: string Whether train, val or test set
-        :param center_and_scale: Center and scale the UV grids
+        Load the SolidLetters dataset
+
+        Args:
+            root_dir (str): Root path to the dataset
+            split (str, optional): Split (train, val, or test) to load. Defaults to "train".
+            center_and_scale (bool, optional): Whether to center and scale the solid. Defaults to True.
+            random_rotate (bool, optional): Whether to apply random rotations to the solid in 90 degree increments. Defaults to False.
         """
         assert split in ("train", "val", "test")
         path = pathlib.Path(root_dir)
 
-        self.center_and_scale = center_and_scale
+        self.random_rotate = random_rotate
 
         if split in ("train", "val"):
-            bin_files = _get_filenames(path, filelist="train.txt")
+            file_paths = _get_filenames(path, filelist="train.txt")
             # The first character of filename must be the alphabet
-            labels = [_char_to_label(fn.stem[0]) for fn in bin_files]
-            train_files, val_files, train_labels, val_labels = train_test_split(
-                bin_files, labels, test_size=0.2, random_state=42, stratify=labels,
+            labels = [_char_to_label(fn.stem[0]) for fn in file_paths]
+            train_files, val_files = train_test_split(
+                file_paths, test_size=0.2, random_state=42, stratify=labels,
             )
             if split == "train":
-                self.graph_files = train_files
-                self.labels = train_labels
+                file_paths = train_files
             elif split == "val":
-                self.graph_files = val_files
-                self.labels = val_labels
+                file_paths = val_files
         elif split == "test":
-            self.graph_files = _get_filenames(path, filelist="test.txt")
-            self.labels = [_char_to_label(fn.stem[0]) for fn in self.graph_files]
+            file_paths = _get_filenames(path, filelist="test.txt")
 
-        self.graphs = []
         print(f"Loading {split} data...")
-        for fn in tqdm(self.graph_files):
-            self.graphs.append(load_graphs(str(fn))[0][0])
-        if self.center_and_scale:
-            for i in range(len(self.graphs)):
-                self.graphs[i].ndata["x"] = util.center_and_scale_uvsolid(
-                    self.graphs[i].ndata["x"]
-                )
+        self.load_graphs(file_paths, center_and_scale)
+        print("Done loading {} files".format(len(self.data)))
 
-    def __len__(self):
-        return len(self.graph_files)
-
-    def __getitem__(self, idx):
-        graph = self.graphs[idx]
-        return graph, torch.tensor([self.labels[idx]]).long()
+    def load_one_graph(self, file_path):
+        # Load the graph using base class method
+        sample = super().load_one_graph(file_path)
+        # Additionally get the label from the filename and store it in the sample dict
+        sample["label"] = torch.tensor([_char_to_label(file_path.stem[0])]).long()
+        return sample
 
     def _collate(self, batch):
-        graphs, labels = map(list, zip(*batch))
-        labels = torch.cat(labels, dim=0)
-        bg = dgl.batch(graphs)
-        return bg, labels
-
-    def get_dataloader(self, batch_size=64, shuffle=True):
-        return DataLoader(
-            self,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            collate_fn=self._collate,
-            num_workers=0,  # Can be set to non-zero on Linux
-            drop_last=True,
-        )
+        collated = super()._collate(batch)
+        collated["label"] =  torch.cat([x["label"] for x in batch], dim=0)
+        return collated

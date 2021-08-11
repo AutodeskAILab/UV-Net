@@ -27,8 +27,9 @@ def build_graph(solid, curv_num_u_samples, surf_num_u_samples, surf_num_v_sample
             face, method="normal", num_u=surf_num_u_samples, num_v=surf_num_v_samples
         )
         mask = uvgrid(
-            face, method="inside", num_u=surf_num_u_samples, num_v=surf_num_v_samples
+            face, method="trimmed", num_u=surf_num_u_samples, num_v=surf_num_v_samples
         )
+        mask = mask != 1
         # Concatenate channel-wise to form face feature tensor
         face_feat = np.concatenate((points, normals, mask), axis=-1)
         graph_face_feat.append(face_feat)

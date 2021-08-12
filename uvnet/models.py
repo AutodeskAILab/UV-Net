@@ -282,6 +282,16 @@ class Segmentation(pl.LightningModule):
         self.val_iou = torchmetrics.IoU(num_classes=num_classes, compute_on_step=False)
         self.test_iou = torchmetrics.IoU(num_classes=num_classes, compute_on_step=False)
 
+        self.train_accuracy = torchmetrics.Accuracy(
+            num_classes=num_classes, compute_on_step=False
+        )
+        self.val_accuracy = torchmetrics.Accuracy(
+            num_classes=num_classes, compute_on_step=False
+        )
+        self.test_accuracy = torchmetrics.Accuracy(
+            num_classes=num_classes, compute_on_step=False
+        )
+
     def forward(self, batched_graph):
         logits = self.model(batched_graph)
         return logits
@@ -296,10 +306,12 @@ class Segmentation(pl.LightningModule):
         self.log("train_loss", loss, on_step=False, on_epoch=True)
         preds = F.softmax(logits, dim=-1)
         self.train_iou(preds, labels)
+        self.train_accuracy(preds, labels)
         return loss
 
     def training_epoch_end(self, outs):
         self.log("train_iou", self.train_iou.compute())
+        self.log("train_accuracy", self.train_accuracy.compute())
 
     def validation_step(self, batch, batch_idx):
         inputs = batch["graph"].to(self.device)
@@ -311,10 +323,12 @@ class Segmentation(pl.LightningModule):
         self.log("val_loss", loss, on_step=False, on_epoch=True)
         preds = F.softmax(logits, dim=-1)
         self.val_iou(preds, labels)
+        self.val_accuracy(preds, labels)
         return loss
 
     def validation_epoch_end(self, outs):
         self.log("val_iou", self.val_iou.compute())
+        self.log("val_accuracy", self.val_accuracy.compute())
 
     def test_step(self, batch, batch_idx):
         inputs = batch["graph"].to(self.device)
@@ -326,9 +340,11 @@ class Segmentation(pl.LightningModule):
         self.log("test_loss", loss, on_step=False, on_epoch=True)
         preds = F.softmax(logits, dim=-1)
         self.test_iou(preds, labels)
+        self.test_accuracy(preds, labels)
 
     def test_epoch_end(self, outs):
         self.log("test_iou", self.test_iou.compute())
+        self.log("test_accuracy", self.test_accuracy.compute())
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters())

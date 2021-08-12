@@ -31,6 +31,12 @@ parser.add_argument(
     help="Whether to randomly rotate the solids in 90 degree increments along the canonical axes",
 )
 parser.add_argument(
+    "--crv_in_channels",
+    type=int,
+    default=6,
+    help="Number of channels for curve input",
+)
+parser.add_argument(
     "--checkpoint",
     type=str,
     default=None,
@@ -92,7 +98,10 @@ results/{args.experiment_name}/{month_day}/{hour_min_second}/best.ckpt
 -----------------------------------------------------------------------------------
     """
     )
-    model = Segmentation(num_classes=Dataset.num_classes())
+    model = Segmentation(
+        num_classes=Dataset.num_classes(), 
+        crv_in_channels=args.crv_in_channels
+    )
     train_data = Dataset(
         root_dir=args.dataset_path, split="train", random_rotate=args.random_rotate
     )

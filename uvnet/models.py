@@ -194,6 +194,7 @@ class UVNetSegmenter(nn.Module):
     def __init__(
         self,
         num_classes,
+        crv_in_channels=6,
         crv_emb_dim=64,
         srf_emb_dim=64,
         graph_emb_dim=128,
@@ -204,6 +205,7 @@ class UVNetSegmenter(nn.Module):
 
         Args:
             num_classes (int): Number of classes to output per-face
+            crv_in_channels (int, optional): Number of input channels for the 1D edge UV-grids
             crv_emb_dim (int, optional): Embedding dimension for the 1D edge UV-grids. Defaults to 64.
             srf_emb_dim (int, optional): Embedding dimension for the 2D face UV-grids. Defaults to 64.
             graph_emb_dim (int, optional): Embedding dimension for the graph. Defaults to 128.
@@ -212,7 +214,7 @@ class UVNetSegmenter(nn.Module):
         super().__init__()
         # A 1D convolutional network to encode B-rep edge geometry represented as 1D UV-grids
         self.curv_encoder = uvnet.encoders.UVNetCurveEncoder(
-            in_channels=6, output_dims=crv_emb_dim
+            in_channels=crv_in_channels, output_dims=crv_emb_dim
         )
         # A 2D convolutional network to encode B-rep face geometry represented as 2D UV-grids
         self.surf_encoder = uvnet.encoders.UVNetSurfaceEncoder(
@@ -263,14 +265,14 @@ class Segmentation(pl.LightningModule):
     PyTorch Lightning module to train/test the segmenter (per-face classifier).
     """
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, crv_in_channels=6):
         """
         Args:
             num_classes (int): Number of per-face classes in the dataset
         """
         super().__init__()
         self.save_hyperparameters()
-        self.model = UVNetSegmenter(num_classes)
+        self.model = UVNetSegmenter(num_classes, crv_in_channels=crv_in_channels)
         # Setting compute_on_step = False to compute "part IoU"
         # This is because we want to compute the IoU on the entire dataset
         # at the end to account for rare classes, rather than within each batch

@@ -32,7 +32,7 @@ class FusionGalleryDataset(BaseDataset):
         # Locate the labels directory.  In s1.0.0 this would be  self.path / "breps"
         # but in s2.0.0 this is self.path / "breps/seg"
         self.seg_path = self.path / "breps/seg"
-        if not seg_path.exists():
+        if not self.seg_path.exists():
             self.seg_path = self.path / "breps"
 
         assert split in ("train", "val", "test")

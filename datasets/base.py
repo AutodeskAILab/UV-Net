@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
+from torch import FloatTensor
 import dgl
 from dgl.data.utils import load_graphs
 from datasets import util
@@ -20,9 +21,13 @@ class BaseDataset(Dataset):
             sample = self.load_one_graph(fn)
             if sample is None:
                 continue
+            if sample["graph"].edata["x"].size(0) == 0:
+                # Catch the case of graphs with no edges
+                continue
             self.data.append(sample)
         if center_and_scale:
             self.center_and_scale()
+        self.convert_to_float32()
     
     def load_one_graph(self, file_path):
         graph = load_graphs(str(file_path))[0][0]
@@ -36,6 +41,11 @@ class BaseDataset(Dataset):
             )
             self.data[i]["graph"].edata["x"][..., :3] -= center
             self.data[i]["graph"].edata["x"][..., :3] *= scale
+
+    def convert_to_float32(self):
+        for i in range(len(self.data)):
+            self.data[i]["graph"].ndata["x"] = self.data[i]["graph"].ndata["x"].type(FloatTensor)
+            self.data[i]["graph"].edata["x"] = self.data[i]["graph"].edata["x"].type(FloatTensor)
 
     def __len__(self):
         return len(self.data)

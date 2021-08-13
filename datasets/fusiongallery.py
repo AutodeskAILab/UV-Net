@@ -28,6 +28,13 @@ class FusionGalleryDataset(BaseDataset):
         """
         path = pathlib.Path(root_dir)
         self.path = path
+
+        # Locate the labels directory.  In s1.0.0 this would be  self.path / "breps"
+        # but in s2.0.0 this is self.path / "breps/seg"
+        self.seg_path = self.path / "breps/seg"
+        if not seg_path.exists():
+            self.seg_path = self.path / "breps"
+
         assert split in ("train", "val", "test")
 
         with open(str(path.joinpath("train_test.json")), "r") as read_file:
@@ -61,7 +68,7 @@ class FusionGalleryDataset(BaseDataset):
         sample = super().load_one_graph(file_path)
         # Additionally load the label and store it as node data
         label = np.loadtxt(
-            self.path.joinpath("breps/seg").joinpath(file_path.stem + ".seg"), dtype=np.int, ndmin=1
+            self.seg_path.joinpath(file_path.stem + ".seg"), dtype=np.int, ndmin=1
         )
         if sample["graph"].number_of_nodes() != label.shape[0]:
             return None

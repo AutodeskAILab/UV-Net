@@ -22,6 +22,8 @@ def triangulate_with_face_mapping(solid, triangle_face_tol=0.01, angle_tol_rads=
     for face in solid.faces():
         face_index = mapper.face_index(face)
         face_verts, face_tris = face.get_triangles()
+        if len(face_tris) == 0:
+            continue
         face_tris += vert_counter
         vert_counter += face_verts.shape[0]
         face_mapping = np.ones(face_tris.shape[0]) * face_index

@@ -3,16 +3,24 @@ import pathlib
 
 import numpy as np
 import trimesh
-from occwl.io import load_step
+from occwl.compound import Compound
 from tqdm import tqdm
 
 from process.solid_to_rendermesh import triangulate_with_face_mapping
 
 
 def process_one_file(fn, args):
+    if fn.stat().st_size == 0:
+        return None
     fn_stem = fn.stem
     output_path = pathlib.Path(args.output)
-    solid = load_step(fn)[0]  # Assume there's one solid per file
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
+    try:
+        solid = Compound.load_from_step(fn)
+    except Exception as e:
+        print(e)
+        return
 
     verts, tris, tri_mapping = triangulate_with_face_mapping(solid)
 
@@ -46,7 +54,7 @@ def process_one_file(fn, args):
 
 def process(args):
     input_path = pathlib.Path(args.input)
-    step_files = list(input_path.glob("*.step")) + list(input_path.glob("*.stp"))
+    step_files = list(input_path.rglob("*.st*p"))
     for fn in tqdm(step_files):
         process_one_file(fn, args)
 

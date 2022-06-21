@@ -8,6 +8,9 @@ from occwl.graph import face_adjacency
 from occwl.io import load_step
 from occwl.uvgrid import ugrid, uvgrid
 from tqdm import tqdm
+from multiprocessing.pool import Pool
+from itertools import repeat
+import signal
 
 
 def build_graph(solid, curv_num_u_samples, surf_num_u_samples, surf_num_v_samples):
@@ -26,10 +29,10 @@ def build_graph(solid, curv_num_u_samples, surf_num_u_samples, surf_num_v_sample
         normals = uvgrid(
             face, method="normal", num_u=surf_num_u_samples, num_v=surf_num_v_samples
         )
-        mask = uvgrid(
-            face, method="trimmed", num_u=surf_num_u_samples, num_v=surf_num_v_samples
+        visibility_status = uvgrid(
+            face, method="visibility_status", num_u=surf_num_u_samples, num_v=surf_num_v_samples
         )
-        mask = mask != 1
+        mask = np.logical_or(visibility_status == 0, visibility_status == 2)  # 0: Inside, 1: Outside, 2: On boundary
         # Concatenate channel-wise to form face feature tensor
         face_feat = np.concatenate((points, normals, mask), axis=-1)
         graph_face_feat.append(face_feat)
@@ -61,7 +64,8 @@ def build_graph(solid, curv_num_u_samples, surf_num_u_samples, surf_num_v_sample
     return dgl_graph
 
 
-def process_one_file(fn, args):
+def process_one_file(arguments):
+    fn, args = arguments
     fn_stem = fn.stem
     output_path = pathlib.Path(args.output)
     solid = load_step(fn)[0]  # Assume there's one solid per file
@@ -71,11 +75,26 @@ def process_one_file(fn, args):
     dgl.data.utils.save_graphs(str(output_path.joinpath(fn_stem + ".bin")), [graph])
 
 
+def initializer():
+    """Ignore CTRL+C in the worker process."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 def process(args):
     input_path = pathlib.Path(args.input)
-    step_files = list(input_path.glob("*.step")) + list(input_path.glob("*.stp"))
-    for fn in tqdm(step_files):
-        process_one_file(fn, args)
+    output_path = pathlib.Path(args.output)
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
+    step_files = list(input_path.glob("*.st*p"))
+    # for fn in tqdm(step_files):
+    #     process_one_file(fn, args)
+    pool = Pool(processes=args.num_processes, initializer=initializer)
+    try:
+        results = list(tqdm(pool.imap(process_one_file, zip(step_files, repeat(args))), total=len(step_files)))
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+    print(f"Processed {len(results)} files.")
 
 
 def main():
@@ -98,6 +117,12 @@ def main():
         type=int,
         default=10,
         help="Number of samples on each surface along the v-direction",
+    )
+    parser.add_argument(
+        "--num_processes",
+        type=int,
+        default=8,
+        help="Number of processes to use",
     )
     args = parser.parse_args()
     process(args)

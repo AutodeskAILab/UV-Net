@@ -1,5 +1,8 @@
 import argparse
+from itertools import repeat
+from multiprocessing.pool import Pool
 import pathlib
+import signal
 
 import numpy as np
 import trimesh
@@ -9,7 +12,8 @@ from tqdm import tqdm
 from process.solid_to_rendermesh import triangulate_with_face_mapping
 
 
-def process_one_file(fn, args):
+def process_one_file(arguments):
+    fn, args = arguments
     if fn.stat().st_size == 0:
         return None
     fn_stem = fn.stem
@@ -52,11 +56,26 @@ def process_one_file(fn, args):
     )
 
 
+def initializer():
+    """Ignore CTRL+C in the worker process."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 def process(args):
     input_path = pathlib.Path(args.input)
-    step_files = list(input_path.rglob("*.st*p"))
-    for fn in tqdm(step_files):
-        process_one_file(fn, args)
+    output_path = pathlib.Path(args.output)
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
+    step_files = list(input_path.glob("*.st*p"))
+    # for fn in tqdm(step_files):
+    #     process_one_file(fn, args)
+    pool = Pool(processes=args.num_processes, initializer=initializer)
+    try:
+        results = list(tqdm(pool.imap(process_one_file, zip(step_files, repeat(args))), total=len(step_files)))
+    except KeyboardInterrupt:
+        pool.terminate()
+        pool.join()
+    print(f"Processed {len(results)} files.")
 
 
 def main():
@@ -70,6 +89,12 @@ def main():
         type=int,
         default=2048,
         help="Number of points in the point cloud",
+    )
+    parser.add_argument(
+        "--num_processes",
+        type=int,
+        default=8,
+        help="Number of processes to use",
     )
     args = parser.parse_args()
     process(args)

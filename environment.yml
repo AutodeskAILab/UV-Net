@@ -7,10 +7,10 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - occwl
   - pytorch
   - pytorch-lightning
   - torchmetrics
+  - occwl=1.0
   - dgl-cuda11.0=0.6.1=py39_0
   - joblib=1.0.1=pyhd3eb1b0_0
   - matplotlib=3.4.2

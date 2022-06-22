@@ -148,9 +148,9 @@ class Classification(pl.LightningModule):
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("train_loss", loss, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
-        self.log("train_acc", self.train_acc(preds, labels), on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(preds, labels), on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -160,9 +160,9 @@ class Classification(pl.LightningModule):
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("val_loss", loss, on_step=False, on_epoch=True)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
-        self.log("val_acc", self.val_acc(preds, labels), on_step=False, on_epoch=True)
+        self.log("val_acc", self.val_acc(preds, labels), on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -172,9 +172,9 @@ class Classification(pl.LightningModule):
         inputs.edata["x"] = inputs.edata["x"].permute(0, 2, 1)
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("test_loss", loss, on_step=False, on_epoch=True)
+        self.log("test_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
-        self.log("test_acc", self.test_acc(preds, labels), on_step=False, on_epoch=True)
+        self.log("test_acc", self.test_acc(preds, labels), on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters())
@@ -291,7 +291,7 @@ class Segmentation(pl.LightningModule):
         labels = inputs.ndata["y"]
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("train_loss", loss, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
         self.train_iou(preds, labels)
         return loss
@@ -306,7 +306,7 @@ class Segmentation(pl.LightningModule):
         labels = inputs.ndata["y"]
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("val_loss", loss, on_step=False, on_epoch=True)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
         self.val_iou(preds, labels)
         return loss
@@ -321,7 +321,7 @@ class Segmentation(pl.LightningModule):
         labels = inputs.ndata["y"]
         logits = self.model(inputs)
         loss = F.cross_entropy(logits, labels, reduction="mean")
-        self.log("test_loss", loss, on_step=False, on_epoch=True)
+        self.log("test_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         preds = F.softmax(logits, dim=-1)
         self.test_iou(preds, labels)
 

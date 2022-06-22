@@ -5,6 +5,7 @@ import time
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.utilities.seed import seed_everything
 
 from datasets.fusiongallery import FusionGalleryDataset
 from datasets.mfcad import MFCADDataset
@@ -77,6 +78,7 @@ elif args.dataset == "fusiongallery":
 
 if args.traintest == "train":
     # Train/val
+    seed_everything(workers=True)
     print(
         f"""
 -----------------------------------------------------------------------------------

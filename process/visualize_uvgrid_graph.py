@@ -70,7 +70,9 @@ def plot_uvsolid_edges(graph: dgl.DGLGraph, ax, tangents=False):
         print("Edge features not found")
         return
     edge_feat = graph.edata["x"]
-    assert len(edge_feat.shape) == 3  # edges x #u x 6
+    if edge_feat.shape[0] == 0:
+        return
+    assert edge_feat.shape[2] in (3, 6), edge_feat.shape  # edges x #u x 3/6
     bbox = bounding_box_uvsolid(face_feat)
     bbox_diag = torch.norm(bbox[1] - bbox[0]).item()
     num_edges = graph.edata["x"].size(0)

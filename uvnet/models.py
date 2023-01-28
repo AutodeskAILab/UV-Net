@@ -1,8 +1,22 @@
+import numpy as np
 import pytorch_lightning as pl
-import torchmetrics
 import torch
-from torch import nn
 import torch.nn.functional as F
+import torchmetrics
+from tqdm import tqdm
+from scipy.spatial.distance import cdist
+from sklearn import svm
+from sklearn.cluster import KMeans
+from sklearn.linear_model import SGDClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics.cluster import (
+    normalized_mutual_info_score,
+    adjusted_mutual_info_score,
+)
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from torch import nn
+
 import uvnet.encoders
 
 
@@ -64,12 +78,12 @@ class UVNetClassifier(nn.Module):
     """
 
     def __init__(
-        self,
-        num_classes,
-        crv_emb_dim=64,
-        srf_emb_dim=64,
-        graph_emb_dim=128,
-        dropout=0.3,
+            self,
+            num_classes,
+            crv_emb_dim=64,
+            srf_emb_dim=64,
+            graph_emb_dim=128,
+            dropout=0.3,
     ):
         """
         Initialize the UV-Net solid classification model
@@ -192,13 +206,13 @@ class UVNetSegmenter(nn.Module):
     """
 
     def __init__(
-        self,
-        num_classes,
-        crv_in_channels=6,
-        crv_emb_dim=64,
-        srf_emb_dim=64,
-        graph_emb_dim=128,
-        dropout=0.3,
+            self,
+            num_classes,
+            crv_in_channels=6,
+            crv_emb_dim=64,
+            srf_emb_dim=64,
+            graph_emb_dim=128,
+            dropout=0.3,
     ):
         """
         Initialize the UV-Net solid face segmentation model
@@ -349,3 +363,219 @@ class Segmentation(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters())
         return optimizer
+
+
+###############################################################################
+# Self-supervised model
+###############################################################################
+
+def mask_correlated_samples(batch_size, device=torch.device("cpu")):
+    N = 2 * batch_size
+    mask = torch.ones((N, N), dtype=bool, device=device)
+    mask = mask.fill_diagonal_(0)
+    for i in range(batch_size):
+        mask[i, batch_size + i] = 0
+        mask[batch_size + i, i] = 0
+    return mask
+
+
+class NTXentLoss(pl.LightningModule):
+    def __init__(self, temperature=0.5):
+        super().__init__()
+        self.temperature = temperature
+        self.criterion = nn.CrossEntropyLoss(reduction="sum")
+        self.similarity_f = nn.CosineSimilarity(dim=2)
+
+    def mask_correlated_samples(self, batch_size):
+        N = 2 * batch_size
+        mask = torch.ones((N, N), dtype=bool, device=self.device)
+        mask = mask.fill_diagonal_(0)
+        mask[:batch_size, batch_size:] = mask[:batch_size, :batch_size]
+        mask[batch_size:, :batch_size] = mask[:batch_size, :batch_size]
+        return mask
+
+    def forward(self, z_i, z_j):
+        """
+        We do not sample negative examples explicitly.
+        Instead, given a positive pair, similar to (Chen et al., 2017), we treat the other 2(N − 1) augmented examples
+        within a minibatch as negative examples.
+        """
+        batch_size = z_i.shape[0]
+        N = 2 * batch_size
+        mask = self.mask_correlated_samples(batch_size)
+
+        z = torch.cat((z_i, z_j), dim=0)
+
+        sim = self.similarity_f(z.unsqueeze(1), z.unsqueeze(0)) / self.temperature
+
+        sim_i_j = torch.diag(sim, batch_size)
+        sim_j_i = torch.diag(sim, -batch_size)
+
+        positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
+        negative_samples = sim[mask].reshape(N, -1)
+
+        labels = torch.zeros(N, device=positive_samples.device, dtype=torch.long)
+        logits = torch.cat((positive_samples, negative_samples), dim=1)
+        loss = self.criterion(logits, labels)
+        loss /= N
+        return loss
+
+
+class UVNetContrastiveLearner(nn.Module):
+    def __init__(
+            self,
+            latent_dim,
+            crv_in_channels=6,
+            crv_emb_dim=64,
+            srf_emb_dim=64,
+            graph_emb_dim=128,
+            dropout=0.3,
+            out_dim=128,
+    ):
+        """
+        UVNetContrastivelearner
+        """
+        super().__init__()
+        self.curv_encoder = uvnet.encoders.UVNetCurveEncoder(
+            in_channels=crv_in_channels, output_dims=crv_emb_dim
+        )
+        self.surf_encoder = uvnet.encoders.UVNetSurfaceEncoder(
+            in_channels=7, output_dims=srf_emb_dim
+        )
+        self.graph_encoder = uvnet.encoders.UVNetGraphEncoder(
+            srf_emb_dim, crv_emb_dim, graph_emb_dim,
+        )
+        self.fc_layers = nn.Sequential(
+            nn.Linear(graph_emb_dim, latent_dim),
+            nn.BatchNorm1d(latent_dim),
+            nn.ReLU(),
+            nn.Linear(latent_dim, latent_dim),
+        )
+        self.projection_layer = nn.Sequential(
+            nn.Linear(latent_dim, latent_dim, bias=False),
+            nn.BatchNorm1d(latent_dim),
+            nn.ReLU(),
+            nn.Linear(latent_dim, latent_dim, bias=False),
+            nn.BatchNorm1d(latent_dim),
+            nn.ReLU(),
+            nn.Linear(latent_dim, out_dim, bias=False),
+        )
+
+    def forward(self, bg):
+        nfeat = bg.ndata["x"]
+        efeat = bg.edata["x"]
+        crv_feat = self.curv_encoder(efeat)
+        srf_feat = self.surf_encoder(nfeat)
+        node_emb, graph_emb = self.graph_encoder(bg, srf_feat, crv_feat)
+        global_emb = self.fc_layers(graph_emb)
+        projection_out = self.projection_layer(global_emb)
+        projection_out = F.normalize(projection_out, p=2, dim=-1)
+
+        return projection_out, global_emb
+
+
+def cluster(embeddings, labels):
+    kmeans = KMeans(init="random", n_clusters=26, n_init=100)
+    kmeans.fit(embeddings)
+    pred_labels = kmeans.labels_
+    # print(labels, pred_labels)
+    score = adjusted_mutual_info_score(list(np.squeeze(labels)), pred_labels)
+    # print("NMI score {}".format(score))
+    return score
+
+
+def classify_svm(
+        train_embeddings, train_labels, test_embeddings, test_labels, max_iter=100000
+):
+    # clf = svm.LinearSVC(max_iter=max_iter)
+    clf = make_pipeline(StandardScaler(), SGDClassifier(max_iter=max_iter, tol=1e-3))
+    ret = clf.fit(train_embeddings, train_labels)
+    pred_labels = clf.predict(test_embeddings)
+    return accuracy_score(test_labels, pred_labels)
+
+
+class Contrastive(pl.LightningModule):
+    """
+    PyTorch Lightning module to train/test the contrastive learning model.
+    """
+
+    def __init__(self, latent_dim=128, out_dim=128):
+        super().__init__()
+        self.save_hyperparameters()
+        self.loss_fn = NTXentLoss()
+        self.model = UVNetContrastiveLearner(latent_dim=latent_dim, out_dim=out_dim)
+
+    def _permute_graph_data_channels(self, graph):
+        graph.ndata["x"] = graph.ndata["x"].permute(0, 3, 1, 2)
+        graph.edata["x"] = graph.edata["x"].permute(0, 2, 1)
+        return graph
+
+    def step(self, batch, batch_idx):
+        graph1, graph2 = batch["graph"], batch["graph2"]
+        graph1 = self._permute_graph_data_channels(graph1)
+        graph2 = self._permute_graph_data_channels(graph2)
+        proj1, _ = self.model(graph1)
+        proj2, _ = self.model(graph2)
+        return self.loss_fn(proj1, proj2)
+
+    def training_step(self, batch, batch_idx):
+        loss = self.step(batch, batch_idx)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss = self.step(batch, batch_idx)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters())
+        return optimizer
+
+    @torch.no_grad()
+    def clustering(self, data, num_clusters=26, n_init=100):
+        kmeans = KMeans(init="random", n_clusters=num_clusters, n_init=n_init)
+        print("Fitting K-Means...")
+        kmeans.fit(data["embeddings"])
+        pred_labels = kmeans.labels_
+        score = adjusted_mutual_info_score(data["labels"], pred_labels)
+        return score
+
+    @torch.no_grad()
+    def linear_svm_classification(self, train_data, test_data, max_iter=100000):
+        clf = make_pipeline(StandardScaler(), SGDClassifier(max_iter=max_iter, tol=1e-3))
+        print("Training Linear SVM...")
+        ret = clf.fit(train_data["embeddings"], train_data["labels"])
+        pred_labels = clf.predict(test_data["embeddings"])
+        return accuracy_score(test_data["labels"], pred_labels)
+
+    @torch.no_grad()
+    def get_embeddings_from_dataloader(self, dataloader):
+        self.eval()
+        embeddings = []
+        outs = []
+        labels = []
+        filenames = []
+        for batch in tqdm(dataloader, desc="Extracting embeddings"):
+            bg = batch["graph"].to(self.device)
+            bg = self._permute_graph_data_channels(bg)
+            proj, emb = self.model(bg)
+            outs.append(proj.detach().cpu().numpy())
+            embeddings.append(emb.detach().cpu().numpy())
+            if "label" in batch:
+                label = batch["label"]
+                labels.append(label.squeeze(-1).detach().cpu().numpy())
+            filenames.extend(batch["filename"])
+        outs = np.concatenate(outs)
+        embeddings = np.concatenate(embeddings)
+        if len(labels) > 0:
+            labels = np.concatenate(labels)
+        else:
+            labels = None
+        data_count = len(dataloader.dataset)
+        assert len(embeddings) == data_count, f"{embeddings.shape}, {data_count}"
+        assert len(outs) == data_count, f"{outs.shape}, {data_count}"
+        if labels is not None:
+            assert len(labels) == data_count
+        assert len(filenames) == data_count, f"{len(filenames)}, {data_count}"
+        return {"embeddings": embeddings, "labels": labels, "outputs": outs, "filenames": filenames}

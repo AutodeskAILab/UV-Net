@@ -113,7 +113,7 @@ else:
 
     # Linear SVM classification on embeddings
     train_data = Dataset(root_dir=args.dataset_path, split="train", size_percentage=args.size_percentage)
-    train_loader = test_data.get_dataloader(
+    train_loader = train_data.get_dataloader(
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=False
     )
     train_outputs = model.get_embeddings_from_dataloader(train_loader)

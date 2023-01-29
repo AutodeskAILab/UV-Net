@@ -26,7 +26,7 @@ class SolidLettersContrastive(BaseContrastiveDataset):
         if split in ("train", "val"):
             file_paths = _get_filenames(path, filelist="train.txt")
             print(f"Found {len(file_paths)} bin files")
-            # The first character of filename must be according to shape_type
+            # The filenames must be according to shape_type
             if shape_type != "both":
                 file_paths = [fn for fn in file_paths if shape_type in fn.stem]
             print(f"Left with {len(file_paths)} bin files after filtering by shape type:", shape_type)
@@ -41,6 +41,11 @@ class SolidLettersContrastive(BaseContrastiveDataset):
             labels = [torch.tensor([_char_to_label(fn.stem[0])]).long() for fn in file_paths]
         elif split == "test":
             file_paths = _get_filenames(path, filelist="test.txt")
+            print(f"Found {len(file_paths)} bin files")
+            # The filenames must be according to shape_type
+            if shape_type != "both":
+                file_paths = [fn for fn in file_paths if shape_type in fn.stem]
+            print(f"Left with {len(file_paths)} bin files after filtering by shape type:", shape_type)
             labels = [torch.tensor([_char_to_label(fn.stem[0])]).long() for fn in file_paths]
         self.labels = labels
 

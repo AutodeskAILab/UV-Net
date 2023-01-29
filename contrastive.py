@@ -1,13 +1,12 @@
 import argparse
+import numpy as np
 import pathlib
 import time
-
+from datasets.solidletters_contrastive import SolidLettersContrastive
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.utilities.seed import seed_everything
-
-from datasets.solidletters_contrastive import SolidLettersContrastive
 from uvnet.models import Contrastive
 
 parser = argparse.ArgumentParser("UV-Net self-supervision with contrastive learning")
@@ -16,8 +15,9 @@ parser.add_argument(
 )
 parser.add_argument("--dataset", choices=("solidletters",), help="Dataset to train on")
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
-parser.add_argument("--batch_size", type=int, default=256, help="Batch size; larger batches are needed for SimCLR style"
-                                                                " learning")
+parser.add_argument("--size_percentage", type=float, default=1, help="Percentage of data to load")
+parser.add_argument("--temperature", type=float, default=0.1, help="Temperature to use in NTXentLoss")
+parser.add_argument("--batch_size", type=int, default=256, help="Batch size; larger batches are needed for SimCLR")
 parser.add_argument(
     "--num_workers",
     type=int,
@@ -89,34 +89,54 @@ results/{args.experiment_name}/{month_day}/{hour_min_second}/best.ckpt
     """
     )
     model = Contrastive()
-    train_data = Dataset(root_dir=args.dataset_path, split="train")
-    val_data = Dataset(root_dir=args.dataset_path, split="val")
-    train_loader = train_data.get_dataloader(
-        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers
-    )
-    val_loader = val_data.get_dataloader(
-        batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
-    )
+    train_data = Dataset(root_dir=args.dataset_path, split="train", size_percentage=args.size_percentage,)
+    val_data = Dataset(root_dir=args.dataset_path, split="val", size_percentage=args.size_percentage)
+    train_loader = train_data.get_dataloader(batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    val_loader = val_data.get_dataloader(batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     trainer.fit(model, train_loader, val_loader)
 else:
     # Test
-    assert (
-        args.checkpoint is not None
-    ), "Expected the --checkpoint argument to be provided"
+    assert args.checkpoint is not None, "Expected the --checkpoint argument to be provided"
     model = Contrastive.load_from_checkpoint(args.checkpoint)
 
-    test_data = Dataset(root_dir=args.dataset_path, split="test")
+    test_data = Dataset(root_dir=args.dataset_path, split="test", size_percentage=args.size_percentage)
     test_loader = test_data.get_dataloader(
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=False
     )
     test_outputs = model.get_embeddings_from_dataloader(test_loader)
 
+    def tsne(embeddings, labels, ax, percentage_data=0.1):
+        from sklearn.manifold import TSNE
+        assert percentage_data > 0.0 and percentage_data <= 1.0
+        if percentage_data < 1.0:
+            count = int(percentage_data * embeddings.shape[0])
+            indices = np.random.choice(
+                list(range(embeddings.shape[0])), count, replace=False
+            )
+            embeddings = embeddings[indices, :]
+            labels = labels[indices]
+        embeddings_2d = TSNE(n_components=2, init="pca").fit_transform(embeddings)
+        ax.scatter(
+            embeddings_2d[:, 0],
+            embeddings_2d[:, 1],
+            c=labels.astype(np.int),
+            cmap=plt.cm.Spectral,
+        )
+
+
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    tsne(test_outputs["embeddings"], test_outputs["labels"], ax=ax, percentage_data=0.2)
+    plt.show()
+
     # K-means clustering on embeddings
-    cluster_acc = model.clustering(test_outputs, num_clusters=26)  # We know there are 26 clusters in SolidLetters
+    cluster_acc = model.clustering(test_outputs, num_clusters=test_data.num_classes())
     print(f"Clustering AMI score (%) on test set: {cluster_acc * 100.0:2.3f}")
 
     # Linear SVM classification on embeddings
-    train_data = Dataset(root_dir=args.dataset_path, split="train")
+    train_data = Dataset(root_dir=args.dataset_path, split="train", size_percentage=args.size_percentage)
     train_loader = test_data.get_dataloader(
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=False
     )

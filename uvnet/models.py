@@ -474,35 +474,15 @@ class UVNetContrastiveLearner(nn.Module):
         return projection_out, global_emb
 
 
-def cluster(embeddings, labels):
-    kmeans = KMeans(init="random", n_clusters=26, n_init=100)
-    kmeans.fit(embeddings)
-    pred_labels = kmeans.labels_
-    # print(labels, pred_labels)
-    score = adjusted_mutual_info_score(list(np.squeeze(labels)), pred_labels)
-    # print("NMI score {}".format(score))
-    return score
-
-
-def classify_svm(
-        train_embeddings, train_labels, test_embeddings, test_labels, max_iter=100000
-):
-    # clf = svm.LinearSVC(max_iter=max_iter)
-    clf = make_pipeline(StandardScaler(), SGDClassifier(max_iter=max_iter, tol=1e-3))
-    ret = clf.fit(train_embeddings, train_labels)
-    pred_labels = clf.predict(test_embeddings)
-    return accuracy_score(test_labels, pred_labels)
-
-
 class Contrastive(pl.LightningModule):
     """
     PyTorch Lightning module to train/test the contrastive learning model.
     """
 
-    def __init__(self, latent_dim=128, out_dim=128):
+    def __init__(self, latent_dim=128, out_dim=128, temperature=0.1):
         super().__init__()
         self.save_hyperparameters()
-        self.loss_fn = NTXentLoss()
+        self.loss_fn = NTXentLoss(temperature=temperature)
         self.model = UVNetContrastiveLearner(latent_dim=latent_dim, out_dim=out_dim)
 
     def _permute_graph_data_channels(self, graph):
@@ -529,13 +509,13 @@ class Contrastive(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters())
+        optimizer = torch.optim.Adam(self.parameters(), weight_decay=1e-4)
         return optimizer
 
     @torch.no_grad()
     def clustering(self, data, num_clusters=26, n_init=100):
-        kmeans = KMeans(init="random", n_clusters=num_clusters, n_init=n_init)
-        print("Fitting K-Means...")
+        kmeans = KMeans(init="k-means++", n_clusters=num_clusters, n_init=n_init)
+        print(f"Fitting K-Means with {num_clusters} clusters...")
         kmeans.fit(data["embeddings"])
         pred_labels = kmeans.labels_
         score = adjusted_mutual_info_score(data["labels"], pred_labels)
@@ -574,8 +554,13 @@ class Contrastive(pl.LightningModule):
             labels = None
         data_count = len(dataloader.dataset)
         assert len(embeddings) == data_count, f"{embeddings.shape}, {data_count}"
+        assert len(embeddings.shape) == 2, f"{embeddings.shape}"
         assert len(outs) == data_count, f"{outs.shape}, {data_count}"
+        assert len(outs.shape) == 2, f"{outs.shape}"
         if labels is not None:
             assert len(labels) == data_count
+            assert len(labels.shape) == 1, f"{labels.shape}"
+            assert len(labels.shape) == 1, f"{labels.shape}"
+        print(filenames[:10], labels[:10])
         assert len(filenames) == data_count, f"{len(filenames)}, {data_count}"
         return {"embeddings": embeddings, "labels": labels, "outputs": outs, "filenames": filenames}

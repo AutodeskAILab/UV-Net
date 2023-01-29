@@ -1,10 +1,13 @@
-from torch.utils.data import Dataset, DataLoader
-from torch import FloatTensor
 import dgl
-from dgl.data.utils import load_graphs
-from datasets import util
-from tqdm import tqdm
+import random
+import torch
 from abc import abstractmethod
+from dgl.data.utils import load_graphs
+from torch import FloatTensor
+from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
+
+from datasets import util
 
 
 class BaseDataset(Dataset):
@@ -78,75 +81,85 @@ class BaseDataset(Dataset):
         )
 
 
+class BaseContrastiveDataset(BaseDataset):
+    def __init__(self, split, prob_full_graph):
+        assert split in ("train", "val", "test")
+        assert 0 <= prob_full_graph <= 1
+        self.split = split
+        self.prob_full_graph = prob_full_graph  # Probability of using the full graph as such as a view
 
-def get_random_subgraph(graph, num_nodes=1, include_neighbors=True, normalize=True):
-    """
-    Gets a random subgraph from the given graph
-    :param graph: DGL graph
-    :param num_nodes: Number of nodes to randomly extract in the subgraph
-    :param include_neighbors: Whether to include one-ring neighbors of the extracted nodes so that we get connected patches
-    :param normalize: Whether to normalize the graph into a cube of size 2
-    """
-    node_idx = random.sample(graph.nodes().cpu().numpy().tolist(), num_nodes)
-    subgraph_nodes = []
-    for idx in node_idx:
-        subgraph_nodes.append(idx)
-        if include_neighbors:
-            # out_edges returns a tuple of src and dst nodes
-            neighbors = graph.out_edges(idx)[1]
-            for ngh in neighbors.cpu().numpy().tolist():
+    def apply_transformation(self, graph):
+        all_transformations = ("sub_graph", "sub_graph_2hops", "drop_nodes", "drop_edges")
+        transformation_type = random.choice(all_transformations)
+        if transformation_type == "sub_graph":
+            return self.get_subgraph(graph, num_nodes=1, hops=1, normalize=True)
+        elif transformation_type == "sub_graph_2hops":
+            return self.get_subgraph(graph, num_nodes=1, hops=2, normalize=True)
+        elif transformation_type == "drop_nodes":
+            graph2 = graph.clone()
+            nodes_to_drop = []
+            for i in range(graph2.number_of_nodes()):
+                if random.random() <= 0.4:
+                    nodes_to_drop.append(i)
+            graph2.remove_nodes(nodes_to_drop)
+            return graph2
+        elif transformation_type == "drop_edges":
+            graph2 = graph.clone()
+            edges_to_drop = []
+            for i in range(graph2.number_of_edges()):
+                if random.random() <= 0.4:
+                    edges_to_drop.append(i)
+            graph2.remove_edges(edges_to_drop)
+            return graph2
+
+    def _collate(self, batch):
+        collated = {"graph": dgl.batch([x["graph"] for x in batch]),
+                    "graph2": dgl.batch([x["graph2"] for x in batch]),
+                    "label": torch.cat([x["label"] for x in batch], dim=0),
+                    "filename": [x["filename"] for x in batch]}
+        return collated
+
+    def __getitem__(self, idx):
+        graph_and_filename = self.data[idx]
+        filename = graph_and_filename["filename"]
+        graph = graph_and_filename["graph"]
+        graph2 = self.apply_transformation(graph.clone())
+        if self.split == "train" and random.uniform(0, 1) > self.prob_full_graph:
+            graph = self.apply_transformation(graph.clone())
+        else:
+            graph = graph.clone()
+        graph.ndata.pop("_ID", None)
+        graph.edata.pop("_ID", None)
+        graph2.ndata.pop("_ID", None)
+        graph2.edata.pop("_ID", None)
+        return {"graph": graph, "graph2": graph2, "label": self.labels[idx],
+                "filename": filename}
+
+    def get_dataloader(self, batch_size=128, shuffle=True, num_workers=0, drop_last=True):
+        return DataLoader(
+            self,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=self._collate,
+            num_workers=num_workers,
+            drop_last=drop_last,
+        )
+
+    def get_subgraph(self, graph, num_nodes=1, hops=2, normalize=False):
+        assert num_nodes >= 1
+        assert hops >= 0
+        # node_idx = random.sample(graph.nodes().cpu().numpy().tolist(), 1)
+        subgraph_nodes = [random.sample(graph.nodes().cpu().numpy().tolist(), 1)[0]]
+        for _ in range(hops):
+            neighbors = []
+            for idx in subgraph_nodes:
+                # out_edges returns a tuple of src and dst nodes
+                neighbors.extend(graph.out_edges(idx)[1].cpu().numpy().tolist())
+            for ngh in neighbors:
                 subgraph_nodes.append(ngh)
-    subgraph_nodes = list(set(subgraph_nodes))
-    subgraph = graph.subgraph(subgraph_nodes)
-    # subgraph.copy_from_parent()
-    if normalize:
-        subgraph.ndata["x"] = font_util.center_and_scale_uvsolid(subgraph.ndata["x"])
-    return subgraph
-
-
-def get_random_subgraph_one_neighbour(
-    graph, num_nodes=1, include_neighbors=True, normalize=True
-):
-    """
-    Gets a random subgraph from the given graph
-    :param graph: DGL graph
-    :param num_nodes: Number of nodes to randomly extract in the subgraph
-    :param include_neighbors: Whether to include one-ring neighbors of the extracted nodes so that we get connected patches
-    :param normalize: Whether to normalize the graph into a cube of size 2
-    """
-    node_idx = random.sample(graph.nodes().cpu().numpy().tolist(), num_nodes)
-    subgraph_nodes = []
-    for idx in node_idx:
-        subgraph_nodes.append(idx)
-        if include_neighbors:
-            # out_edges returns a tuple of src and dst nodes
-            neighbors = graph.out_edges(idx)[1]
-            for ngh in neighbors.cpu().numpy().tolist():
-                subgraph_nodes.append(ngh)
-                break
-    subgraph_nodes = list(set(subgraph_nodes))
-    subgraph = graph.subgraph(subgraph_nodes)
-    # subgraph.copy_from_parent()
-    if normalize:
-        subgraph.ndata["x"] = font_util.center_and_scale_uvsolid(subgraph.ndata["x"])
-    return subgraph
-
-
-def get_subgraph(graph, num_nodes=1, hops=2, normalize=False):
-    assert num_nodes >= 1
-    assert hops >= 0
-    node_idx = random.sample(graph.nodes().cpu().numpy().tolist(), 1)
-    subgraph_nodes = [random.sample(graph.nodes().cpu().numpy().tolist(), 1)[0]]
-    for h in range(hops):
-        neighbors = []
-        for idx in subgraph_nodes:
-            # out_edges returns a tuple of src and dst nodes
-            neighbors.extend(graph.out_edges(idx)[1].cpu().numpy().tolist())
-        for ngh in neighbors:
-            subgraph_nodes.append(ngh)
-    subgraph_nodes = list(set(subgraph_nodes))
-    subgraph = graph.subgraph(subgraph_nodes)
-    # subgraph.copy_from_parent()
-    if normalize:
-        subgraph.ndata["x"] = font_util.center_and_scale_uvsolid(subgraph.ndata["x"])
-    return subgraph
+        subgraph_nodes = list(set(subgraph_nodes))
+        subgraph = graph.subgraph(subgraph_nodes)
+        # subgraph.copy_from_parent()
+        if normalize:
+            subgraph = self.center_and_scale_graph(subgraph)
+        return subgraph

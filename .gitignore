@@ -130,6 +130,7 @@ dmypy.json
 
 results/*
 .vscode/
+.idea/
 run_scripts/
 segmentation_checkpoints/
 segmentation_logs/

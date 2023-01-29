@@ -98,38 +98,14 @@ else:
     # Test
     assert args.checkpoint is not None, "Expected the --checkpoint argument to be provided"
     model = Contrastive.load_from_checkpoint(args.checkpoint)
+    if args.gpus is not None:
+        model = model.cuda()
 
     test_data = Dataset(root_dir=args.dataset_path, split="test", size_percentage=args.size_percentage)
     test_loader = test_data.get_dataloader(
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=False
     )
     test_outputs = model.get_embeddings_from_dataloader(test_loader)
-
-    def tsne(embeddings, labels, ax, percentage_data=0.1):
-        from sklearn.manifold import TSNE
-        assert percentage_data > 0.0 and percentage_data <= 1.0
-        if percentage_data < 1.0:
-            count = int(percentage_data * embeddings.shape[0])
-            indices = np.random.choice(
-                list(range(embeddings.shape[0])), count, replace=False
-            )
-            embeddings = embeddings[indices, :]
-            labels = labels[indices]
-        embeddings_2d = TSNE(n_components=2, init="pca").fit_transform(embeddings)
-        ax.scatter(
-            embeddings_2d[:, 0],
-            embeddings_2d[:, 1],
-            c=labels.astype(np.int),
-            cmap=plt.cm.Spectral,
-        )
-
-
-    import matplotlib.pyplot as plt
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    tsne(test_outputs["embeddings"], test_outputs["labels"], ax=ax, percentage_data=0.2)
-    plt.show()
 
     # K-means clustering on embeddings
     cluster_acc = model.clustering(test_outputs, num_clusters=test_data.num_classes())

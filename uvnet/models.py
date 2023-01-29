@@ -561,6 +561,5 @@ class Contrastive(pl.LightningModule):
             assert len(labels) == data_count
             assert len(labels.shape) == 1, f"{labels.shape}"
             assert len(labels.shape) == 1, f"{labels.shape}"
-        print(filenames[:10], labels[:10])
         assert len(filenames) == data_count, f"{len(filenames)}, {data_count}"
         return {"embeddings": embeddings, "labels": labels, "outputs": outs, "filenames": filenames}

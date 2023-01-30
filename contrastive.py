@@ -17,6 +17,8 @@ parser.add_argument("--dataset", choices=("solidletters",), help="Dataset to tra
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
 parser.add_argument("--size_percentage", type=float, default=1, help="Percentage of data to load")
 parser.add_argument("--temperature", type=float, default=0.1, help="Temperature to use in NTXentLoss")
+parser.add_argument("--latent_dim", type=int, default=128, help="Latent dimension for UV-Net's embeddings")
+parser.add_argument("--out_dim", type=int, default=64, help="Output dimension for SimCLR projection head")
 parser.add_argument("--batch_size", type=int, default=256, help="Batch size; larger batches are needed for SimCLR")
 parser.add_argument(
     "--num_workers",
@@ -88,7 +90,7 @@ results/{args.experiment_name}/{month_day}/{hour_min_second}/best.ckpt
 -----------------------------------------------------------------------------------
     """
     )
-    model = Contrastive()
+    model = Contrastive(latent_dim=args.latent_dim, out_dim=args.out_dim, temperature=args.temperature)
     train_data = Dataset(root_dir=args.dataset_path, split="train", size_percentage=args.size_percentage,)
     val_data = Dataset(root_dir=args.dataset_path, split="val", size_percentage=args.size_percentage)
     train_loader = train_data.get_dataloader(batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)

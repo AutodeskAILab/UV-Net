@@ -45,6 +45,12 @@ class BaseDataset(Dataset):
         graph.edata["x"][..., :3] *= scale
         return graph
 
+    def jitter_graph(self, graph):
+        noise = random.uniform(-0.2, 0.2)
+        graph.edata["x"][..., :3] += noise
+        graph.edata["x"][..., :3] += noise
+        return graph
+
     def center_and_scale(self):
         for i in range(len(self.data)):
             self.data[i]["graph"] = self.center_and_scale_graph(self.data[i]["graph"])
@@ -92,9 +98,9 @@ class BaseContrastiveDataset(BaseDataset):
         all_transformations = ("sub_graph", "sub_graph_2hops", "drop_nodes", "drop_edges")
         transformation_type = random.choice(all_transformations)
         if transformation_type == "sub_graph":
-            return self.get_subgraph(graph, num_nodes=1, hops=1, normalize=True)
+            return self.get_subgraph(graph, num_nodes=1, hops=1, normalize=False)
         elif transformation_type == "sub_graph_2hops":
-            return self.get_subgraph(graph, num_nodes=1, hops=2, normalize=True)
+            return self.get_subgraph(graph, num_nodes=1, hops=2, normalize=False)
         elif transformation_type == "drop_nodes":
             graph2 = graph.clone()
             nodes_to_drop = []
@@ -132,6 +138,8 @@ class BaseContrastiveDataset(BaseDataset):
         graph.edata.pop("_ID", None)
         graph2.ndata.pop("_ID", None)
         graph2.edata.pop("_ID", None)
+        graph = self.jitter_graph(graph)
+        graph2 = self.jitter_graph(graph2)
         return {"graph": graph, "graph2": graph2, "label": self.labels[idx],
                 "filename": filename}
 

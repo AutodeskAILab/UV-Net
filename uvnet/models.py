@@ -419,7 +419,7 @@ class UVNetContrastiveLearner(nn.Module):
     def __init__(
             self,
             latent_dim,
-            crv_in_channels=6,
+            crv_in_channels=3,
             crv_emb_dim=64,
             srf_emb_dim=64,
             graph_emb_dim=128,
@@ -430,24 +430,26 @@ class UVNetContrastiveLearner(nn.Module):
         UVNetContrastivelearner
         """
         super().__init__()
+        self.crv_in_channels = crv_in_channels
         self.curv_encoder = uvnet.encoders.UVNetCurveEncoder(
             in_channels=crv_in_channels, output_dims=crv_emb_dim
         )
         self.surf_encoder = uvnet.encoders.UVNetSurfaceEncoder(
-            in_channels=7, output_dims=srf_emb_dim
+            in_channels=4, output_dims=srf_emb_dim
         )
         self.graph_encoder = uvnet.encoders.UVNetGraphEncoder(
             srf_emb_dim, crv_emb_dim, graph_emb_dim,
         )
-        self.fc_layers = nn.Sequential(
-            nn.Linear(graph_emb_dim, latent_dim),
-            nn.BatchNorm1d(latent_dim),
-            nn.ReLU(),
-            nn.Linear(latent_dim, latent_dim),
-        )
+        # self.fc_layers = nn.Sequential(
+        #     nn.Linear(graph_emb_dim, latent_dim, bias=False),
+        #     nn.BatchNorm1d(latent_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(latent_dim, latent_dim),
+        # )
         self.projection_layer = nn.Sequential(
             nn.Linear(latent_dim, latent_dim, bias=False),
             nn.BatchNorm1d(latent_dim),
+            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(latent_dim, latent_dim, bias=False),
             nn.BatchNorm1d(latent_dim),
@@ -456,12 +458,14 @@ class UVNetContrastiveLearner(nn.Module):
         )
 
     def forward(self, bg):
-        nfeat = bg.ndata["x"]
-        efeat = bg.edata["x"]
+        # We only use point coordinates & mask in contrastive experiments
+        # TODO(pradeep): expose a better way for the user to select these channels
+        nfeat = bg.ndata["x"][:, [0, 1, 2, 6], :, :]  # XYZ+mask channels
+        efeat = bg.edata["x"][:, :self.crv_in_channels, :]
         crv_feat = self.curv_encoder(efeat)
         srf_feat = self.surf_encoder(nfeat)
         node_emb, graph_emb = self.graph_encoder(bg, srf_feat, crv_feat)
-        global_emb = self.fc_layers(graph_emb)
+        global_emb = graph_emb  # self.fc_layers(graph_emb)
         projection_out = self.projection_layer(global_emb)
         projection_out = F.normalize(projection_out, p=2, dim=-1)
 

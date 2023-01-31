@@ -511,10 +511,15 @@ class Contrastive(pl.LightningModule):
         return optimizer
 
     @torch.no_grad()
-    def clustering(self, data, num_clusters=26, n_init=100):
-        kmeans = KMeans(init="k-means++", n_clusters=num_clusters, n_init=n_init)
+    def clustering(self, data, num_clusters=26, n_init=100, standardize=False):
+        if standardize:
+            scaler = StandardScaler().fit(data["embeddings"])
+            embeddings = scaler.transform(data["embeddings"].copy())
+        else:
+            embeddings = data["embeddings"]
+        kmeans = KMeans(init="random", n_clusters=num_clusters, n_init=n_init, max_iter=100000)
         print(f"Fitting K-Means with {num_clusters} clusters...")
-        kmeans.fit(data["embeddings"])
+        kmeans.fit(embeddings)
         pred_labels = kmeans.labels_
         score = adjusted_mutual_info_score(data["labels"], pred_labels)
         return score

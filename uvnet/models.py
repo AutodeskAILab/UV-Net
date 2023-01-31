@@ -380,19 +380,13 @@ def mask_correlated_samples(batch_size, device=torch.device("cpu")):
 
 
 class NTXentLoss(pl.LightningModule):
-    def __init__(self, temperature=0.5):
+    def __init__(self, temperature=0.5, batch_size=256):
         super().__init__()
         self.temperature = temperature
         self.criterion = nn.CrossEntropyLoss(reduction="sum")
         self.similarity_f = nn.CosineSimilarity(dim=2)
-
-    def mask_correlated_samples(self, batch_size):
-        N = 2 * batch_size
-        mask = torch.ones((N, N), dtype=bool, device=self.device)
-        mask = mask.fill_diagonal_(0)
-        mask[:batch_size, batch_size:] = mask[:batch_size, :batch_size]
-        mask[batch_size:, :batch_size] = mask[:batch_size, :batch_size]
-        return mask
+        mask = mask_correlated_samples(batch_size, self.device)
+        self.register_buffer("mask", mask)
 
     def forward(self, z_i, z_j):
         """
@@ -402,7 +396,7 @@ class NTXentLoss(pl.LightningModule):
         """
         batch_size = z_i.shape[0]
         N = 2 * batch_size
-        mask = self.mask_correlated_samples(batch_size)
+        mask = self.mask  # self.mask_correlated_samples(batch_size)
 
         z = torch.cat((z_i, z_j), dim=0)
 

@@ -110,8 +110,10 @@ else:
     test_outputs = model.get_embeddings_from_dataloader(test_loader)
 
     # K-means clustering on embeddings
-    cluster_acc = model.clustering(test_outputs, num_clusters=test_data.num_classes())
-    print(f"Clustering AMI score (%) on test set: {cluster_acc * 100.0:2.3f}")
+    cluster_ami = model.clustering(test_outputs, num_clusters=test_data.num_classes(), standardize=False)
+    print(f"Clustering AMI score on test set: {cluster_ami:2.3f}")
+    cluster_ami = model.clustering(test_outputs, num_clusters=test_data.num_classes(), standardize=True)
+    print(f"Clustering AMI score on standardized test set: {cluster_ami:2.3f}")
 
     # Linear SVM classification on embeddings
     train_data = Dataset(root_dir=args.dataset_path, split="train", size_percentage=args.size_percentage)
